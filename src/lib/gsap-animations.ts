@@ -90,7 +90,7 @@ export class AlgorithmAnimations {
         force3D: true,
       }, '>')
       .to([element1, element2], {
-        x: (index: number, target: Element) => {
+        x: (_index: number, target: Element) => {
           const rect1 = (element1 as Element).getBoundingClientRect()
           const rect2 = (element2 as Element).getBoundingClientRect()
           return target === element1 ? rect2.left - rect1.left : rect1.left - rect2.left

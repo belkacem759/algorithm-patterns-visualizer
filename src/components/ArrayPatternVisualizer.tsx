@@ -1,76 +1,13 @@
 import { gsap } from 'gsap';
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  longestUniqueSubarray,
-  maxSubarraySum
-} from '../algorithms/slidingWindow';
-import {
-  twoSumSorted,
-  validPalindromeArray
-} from '../algorithms/twoPointers';
-import { ALGORITHM_CODE } from '../data/algorithmCode';
+import { ALGORITHMS, ALGORITHM_CATEGORIES } from '../algorithms';
 import { CodeDisplay } from './CodeDisplay';
 import { Button } from './ui/Button';
 import { Sidebar } from './ui/Sidebar';
+import { UserInput } from './UserInput';
+import type { UserInputData } from '../types/simple';
 
-type AlgorithmType = 'two-sum' | 'palindrome' | 'max-subarray' | 'longest-unique';
-
-interface AlgorithmData {
-  array: number[];
-  target?: number;
-  k?: number;
-}
-
-const SAMPLE_DATA: Record<AlgorithmType, AlgorithmData> = {
-  'two-sum': {
-    array: [2, 7, 11, 15, 18, 22, 25, 30],
-    target: 9
-  },
-  'palindrome': {
-    array: [1, 2, 3, 2, 1, 4, 5, 6, 7, 8, 9]
-  },
-  'max-subarray': {
-    array: [2, 1, 5, 1, 3, 2, 7, 4, 6, 3, 8, 1, 2, 5],
-    k: 4
-  },
-  'longest-unique': {
-    array: [1, 2, 3, 1, 2, 4, 5, 6, 2, 7, 8, 9, 1, 3]
-  }
-};
-
-// Algorithm categories for the sidebar
-const ALGORITHM_CATEGORIES = [
-  {
-    name: 'Two Pointers',
-    algorithms: [
-      {
-        id: 'two-sum',
-        name: 'Two Sum',
-        description: 'Find two numbers that add up to target'
-      },
-      {
-        id: 'palindrome',
-        name: 'Valid Palindrome',
-        description: 'Check if array reads same forwards/backwards'
-      }
-    ]
-  },
-  {
-    name: 'Sliding Window',
-    algorithms: [
-      {
-        id: 'max-subarray',
-        name: 'Maximum Subarray',
-        description: 'Find maximum sum of fixed-size subarray'
-      },
-      {
-        id: 'longest-unique',
-        name: 'Longest Unique',
-        description: 'Find longest substring with unique elements'
-      }
-    ]
-  }
-];
+type AlgorithmType = keyof typeof ALGORITHMS;
 
 export const ArrayPatternVisualizer: React.FC = () => {
   const [currentAlgorithm, setCurrentAlgorithm] = useState<AlgorithmType>('two-sum');
@@ -79,7 +16,9 @@ export const ArrayPatternVisualizer: React.FC = () => {
   const [steps, setSteps] = useState<any[]>([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const [autoPlayDelay, setAutoPlayDelay] = useState(1000); // Default 1 second delay
+  const [autoPlayDelay, setAutoPlayDelay] = useState(1000);
+  const [currentData, setCurrentData] = useState<UserInputData>(ALGORITHMS['two-sum'].defaultExample);
+  const [showUserInput, setShowUserInput] = useState(false);
 
   const arrayRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<gsap.core.Timeline | null>(null);
@@ -87,24 +26,16 @@ export const ArrayPatternVisualizer: React.FC = () => {
 
   // Initialize algorithm and generate steps
   useEffect(() => {
-    const data = SAMPLE_DATA[currentAlgorithm];
-    let result: any;
+    const algorithm = ALGORITHMS[currentAlgorithm];
+    
+    // Check if required parameters are present
+    const missingParams = algorithm.requiredParams.filter(param => 
+      currentData[param as keyof UserInputData] === undefined
+    );
+    if (missingParams.length > 0) return;
 
-    switch (currentAlgorithm) {
-      case 'two-sum':
-        result = twoSumSorted(data.array, data.target!);
-        break;
-      case 'palindrome':
-        result = validPalindromeArray(data.array);
-        break;
-      case 'max-subarray':
-        result = maxSubarraySum(data.array, data.k!);
-        break;
-      case 'longest-unique':
-        result = longestUniqueSubarray(data.array);
-        break;
-    }
-
+    const result = algorithm.execute(currentData);
+    
     setSteps(result.steps);
     setCurrentStep(0);
     setIsPlaying(false);
@@ -115,7 +46,7 @@ export const ArrayPatternVisualizer: React.FC = () => {
       clearTimeout(autoPlayTimeoutRef.current);
       autoPlayTimeoutRef.current = null;
     }
-  }, [currentAlgorithm]);
+  }, [currentAlgorithm, currentData]);
 
   // Animation functions
   const animateStep = (step: any) => {
@@ -281,10 +212,17 @@ export const ArrayPatternVisualizer: React.FC = () => {
   };
 
   const handleAlgorithmSelect = (algorithmId: string) => {
-    setCurrentAlgorithm(algorithmId as AlgorithmType);
+    const newAlgorithm = algorithmId as AlgorithmType;
+    setCurrentAlgorithm(newAlgorithm);
+    setCurrentData(ALGORITHMS[newAlgorithm].defaultExample);
+    setShowUserInput(false);
   };
 
-  const currentData = SAMPLE_DATA[currentAlgorithm];
+  const handleUserInputChange = (data: UserInputData) => {
+    setCurrentData(data);
+    setShowUserInput(false);
+  };
+
   const currentStepData = steps[currentStep];
 
   return (
@@ -317,31 +255,49 @@ export const ArrayPatternVisualizer: React.FC = () => {
             <CodeDisplay
               algorithm={currentAlgorithm}
               currentStep={currentStep}
-              code={ALGORITHM_CODE[currentAlgorithm]?.code || ''}
-              highlightedLines={ALGORITHM_CODE[currentAlgorithm]?.stepToLines[currentStep] || []}
+              code={ALGORITHMS[currentAlgorithm].code}
+              highlightedLines={ALGORITHMS[currentAlgorithm].stepToLines[currentStep] || []}
             />
           </div>
 
           {/* Visualization Panel */}
           <div className="w-1/2 flex flex-col">
+            {/* Input Controls */}
+            <div className="p-4 bg-gray-50 border-b border-gray-200">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-gray-900">
+                  Current Array: [{currentData.array.join(', ')}]
+                  {currentData.target && ` | Target: ${currentData.target}`}
+                  {currentData.k && ` | Window Size: ${currentData.k}`}
+                </h3>
+                <Button
+                  onClick={() => setShowUserInput(!showUserInput)}
+                  variant="outline"
+                  className="text-sm"
+                >
+                  {showUserInput ? 'Hide Input' : 'Edit Data'}
+                </Button>
+              </div>
+              
+              {showUserInput && (
+                <UserInput
+                  algorithmType={currentAlgorithm}
+                  onInputChange={handleUserInputChange}
+                  initialData={currentData}
+                />
+              )}
+            </div>
+
             {/* Problem Description */}
             {currentStepData && (
               <div className="p-4 bg-blue-50 border-b border-blue-200">
                 <h3 className="font-semibold text-blue-900 mb-2">
-                  {currentAlgorithm === 'two-sum' && 'Two Sum Problem'}
-                  {currentAlgorithm === 'palindrome' && 'Valid Palindrome Problem'}
-                  {currentAlgorithm === 'max-subarray' && 'Maximum Subarray Sum Problem'}
-                  {currentAlgorithm === 'longest-unique' && 'Longest Unique Substring Problem'}
+                  {ALGORITHMS[currentAlgorithm].name} Problem
                 </h3>
                 <p className="text-blue-800 text-sm">
-                  {currentAlgorithm === 'two-sum' &&
-                    `Given a sorted array and a target sum (${currentData.target}), find two numbers that add up to the target. Use two pointers starting from both ends.`}
-                  {currentAlgorithm === 'palindrome' &&
-                    'Given an array of numbers, determine if it reads the same forwards and backwards using two pointers.'}
-                  {currentAlgorithm === 'max-subarray' &&
-                    `Find the maximum sum of any subarray of size ${currentData.k} using a sliding window approach.`}
-                  {currentAlgorithm === 'longest-unique' &&
-                    'Find the length of the longest substring with all unique elements using a sliding window.'}
+                  {ALGORITHMS[currentAlgorithm].description}
+                  {currentData.target && ` Target: ${currentData.target}`}
+                  {currentData.k && ` Window size: ${currentData.k}`}
                 </p>
               </div>
             )}

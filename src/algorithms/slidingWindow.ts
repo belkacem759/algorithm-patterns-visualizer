@@ -1,4 +1,4 @@
-import type { ArrayPatternStep } from '../types/arrayPatterns';
+import type { ArrayPatternStep } from '../types/simple';
 
 export interface MaxSubarrayResult {
   maxSum: number;
